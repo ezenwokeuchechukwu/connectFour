@@ -1,0 +1,281 @@
+@using ConnectFour
+@using System.Drawing
+@inject GameState State
+
+<!-- COLUMN DROP BUTTONS -->
+<nav class="controls">
+    @for (byte i = 0; i < 7; i++)
+    {
+        var col = i;
+        <span class="drop-btn"
+              role="button"
+              aria-label="Drop piece in column @col"
+              title="Drop piece"
+              @onclick="() => PlayPiece(col)">
+            🔽
+        </span>
+    }
+</nav>
+
+
+<!-- STATUS -->
+<div class="status">
+    @if (!string.IsNullOrEmpty(winnerMessage))
+    {
+        <strong>@winnerMessage</strong>
+        <button @onclick="ResetGame">Reset Game</button>
+    }
+    else
+    {
+        <span>Player @State.PlayerTurn's Turn</span>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error">@errorMessage</div>
+    }
+</div>
+
+<!-- MOVE HISTORY -->
+<div class="moves">
+    <h4>Move History</h4>
+
+    @if (moves.Count == 0)
+    {
+        <p>No moves yet</p>
+    }
+    else
+    {
+        <ol>
+            @foreach (var move in moves)
+            {
+                <li>@move</li>
+            }
+        </ol>
+    }
+</div>
+
+<!-- BOARD -->
+<div class="board">
+    @for (byte col = 0; col < 7; col++)
+    {
+        <div class="column" @onclick="() => PlayPiece(col)">
+            @for (int row = 0; row < 6; row++)
+            {
+                <span class="hole"></span>
+            }
+        </div>
+    }
+
+    @for (int i = 0; i < 42; i++)
+    {
+        if (!string.IsNullOrEmpty(pieces[i]))
+        {
+            <span class="@pieces[i] piece"></span>
+        }
+    }
+</div>
+
+<HeadContent>
+    <style>
+        :root {
+            --board-bg: @ColorTranslator.ToHtml(BoardColor);
+            --player1: @Player1Hex;
+            --player2: @Player2Hex;
+        }
+
+        /* CONTROLS */
+        .controls {
+            width: 420px;
+            display: flex;
+            margin-bottom: 5px;
+        }
+
+        .drop-btn {
+            width: 60px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 1.2em;
+            user-select: none;
+        }
+
+        /* COLOR PICKERS */
+        .color-picker {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .color-picker label {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        /* STATUS */
+        .status {
+            margin-bottom: 10px;
+        }
+
+        .error {
+            color: red;
+            font-size: 0.9em;
+        }
+
+        /* MOVE HISTORY */
+        .moves {
+            margin-top: 15px;
+            width: 420px;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .moves h4 {
+            margin: 0 0 5px 0;
+        }
+
+        .moves ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        /* BOARD */
+        .board {
+            position: relative;
+            width: 420px;
+            height: 360px;
+            display: flex;
+            background-color: var(--board-bg);
+            border-radius: 12px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* COLUMNS */
+        .column {
+            width: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        /* HOLES */
+        .hole {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border-radius: 50%;
+            margin: 5px auto;
+            pointer-events: none;
+        }
+
+        /* PIECES */
+        .piece {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            top: 10px;
+            animation-fill-mode: forwards;
+            pointer-events: none;
+        }
+
+        .player1 { background-color: var(--player1); }
+        .player2 { background-color: var(--player2); }
+
+        /* COLUMN POSITIONS */
+        .col0 { left: 10px; }
+        .col1 { left: 70px; }
+        .col2 { left: 130px; }
+        .col3 { left: 190px; }
+        .col4 { left: 250px; }
+        .col5 { left: 310px; }
+        .col6 { left: 370px; }
+
+        /* DROP ANIMATIONS */
+        .drop1 { animation: drop1 0.6s ease-out forwards; }
+        .drop2 { animation: drop2 0.6s ease-out forwards; }
+        .drop3 { animation: drop3 0.6s ease-out forwards; }
+        .drop4 { animation: drop4 0.6s ease-out forwards; }
+        .drop5 { animation: drop5 0.6s ease-out forwards; }
+        .drop6 { animation: drop6 0.6s ease-out forwards; }
+
+        @@keyframes drop1 { to { transform: translateY(0px); } }
+        @@keyframes drop2 { to { transform: translateY(60px); } }
+        @@keyframes drop3 { to { transform: translateY(120px); } }
+        @@keyframes drop4 { to { transform: translateY(180px); } }
+        @@keyframes drop5 { to { transform: translateY(240px); } }
+        @@keyframes drop6 { to { transform: translateY(300px); } }
+    </style>
+</HeadContent>
+
+@code {
+    [Parameter] public Color BoardColor { get; set; } = Color.Black;
+    [Parameter] public Color Player1Color { get; set; } = Color.Green;
+    [Parameter] public Color Player2Color { get; set; } = Color.Purple;
+
+    private readonly string[] pieces = new string[42];
+    private readonly List<string> moves = new(); // ✅ move history
+    private string winnerMessage = "";
+    private string errorMessage = "";
+
+    private string Player1Hex => ColorTranslator.ToHtml(Player1Color);
+    private string Player2Hex => ColorTranslator.ToHtml(Player2Color);
+
+    protected override void OnInitialized() => ResetGame();
+
+    private void OnPlayer1ColorChange(ChangeEventArgs e)
+    {
+        Player1Color = ColorTranslator.FromHtml(e.Value?.ToString() ?? "#00FF00");
+    }
+
+    private void OnPlayer2ColorChange(ChangeEventArgs e)
+    {
+        Player2Color = ColorTranslator.FromHtml(e.Value?.ToString() ?? "#800080");
+    }
+
+    private void PlayPiece(byte col)
+    {
+        if (!string.IsNullOrEmpty(winnerMessage)) return;
+
+        errorMessage = "";
+
+        try
+        {
+            int currentPlayer = State.PlayerTurn;
+            int row = State.PlayPiece(col);
+
+            int index = (5 - row) * 7 + col;
+            pieces[index] = $"player{currentPlayer} col{col} drop{row + 1}";
+
+            // ✅ ADD MOVE TO HISTORY
+            moves.Add($"Player {currentPlayer} → Column {col + 1}");
+        }
+        catch (ArgumentException ex)
+        {
+            errorMessage = ex.Message;
+        }
+
+        winnerMessage = State.CheckForWin() switch
+        {
+            GameState.WinState.Player1_Wins => "Player 1 Wins!",
+            GameState.WinState.Player2_Wins => "Player 2 Wins!",
+            GameState.WinState.Tie => "It's a Tie!",
+            _ => ""
+        };
+    }
+
+    private void ResetGame()
+    {
+        State.ResetBoard();
+        Array.Clear(pieces);
+        moves.Clear(); // ✅ CLEAR MOVE HISTORY
+        winnerMessage = "";
+        errorMessage = "";
+    }
+}
